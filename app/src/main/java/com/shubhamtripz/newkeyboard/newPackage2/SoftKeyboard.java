@@ -18,6 +18,7 @@ package com.shubhamtripz.newkeyboard.newPackage2;
 
 import android.app.Dialog;
 import android.content.Context;
+import android.content.res.Resources;
 import android.inputmethodservice.InputMethodService;
 import android.inputmethodservice.Keyboard;
 import android.inputmethodservice.KeyboardView;
@@ -25,9 +26,11 @@ import android.os.Build;
 import android.os.IBinder;
 import android.text.InputType;
 import android.text.method.MetaKeyKeyListener;
+import android.util.Log;
 import android.view.Display;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -36,6 +39,8 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
 import android.view.inputmethod.InputMethodSubtype;
+import android.widget.Button;
+import android.widget.LinearLayout;
 
 import androidx.annotation.NonNull;
 
@@ -84,6 +89,7 @@ public class SoftKeyboard extends InputMethodService
     private LatinKeyboard mCurKeyboard;
 
     private String mWordSeparators;
+    private KeyboardDragDelegate keyboardDragDelegate;
 
     /**
      * Main initialization of the input method component.  Be sure to call
@@ -93,6 +99,7 @@ public class SoftKeyboard extends InputMethodService
         super.onCreate();
         mInputMethodManager = (InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);
         mWordSeparators = getResources().getString(R.string.word_separators);
+        keyboardDragDelegate = new KeyboardDragDelegate(this, getWindow().getWindow());
     }
     /**
      * Returns the context object whose resources are adjusted to match the metrics of the display.
@@ -151,18 +158,69 @@ public class SoftKeyboard extends InputMethodService
      * is displayed, and every time it needs to be re-created such as due to
      * a configuration change.
      */
-    @Override public View onCreateInputView() {
-        mInputView = (LatinKeyboardView) getLayoutInflater().inflate(
+    @Override
+    public View onCreateInputView() {
+        final LinearLayout keyboardParent = (LinearLayout) getLayoutInflater().inflate(
                 R.layout.input, null);
+
+        Button handle = keyboardParent.findViewById(R.id.handle);
+        handle.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View view, MotionEvent motionEvent) {
+                return keyboardDragDelegate.onTouch(view, motionEvent);
+            }
+        });
+        mInputView = (LatinKeyboardView) keyboardParent.findViewById(R.id.keyboard);
+
         mInputView.setOnKeyboardActionListener(this);
+        mInputView.setPreviewEnabled(false);
         setLatinKeyboard(mQwertyKeyboard);
-        return mInputView;
+        return keyboardParent;
     }
+
     private void setLatinKeyboard(LatinKeyboard nextKeyboard) {
         final boolean shouldSupportLanguageSwitchKey =
                 mInputMethodManager.shouldOfferSwitchingToNextInputMethod(getToken());
         nextKeyboard.setLanguageSwitchKeyVisibility(shouldSupportLanguageSwitchKey);
         mInputView.setKeyboard(nextKeyboard);
+    }
+
+    private static final String TAG = "SoftKeyboard";
+
+    @Override
+    public void onConfigureWindow(Window win, boolean isFullscreen, boolean isCandidatesOnly) {
+
+        WindowManager.LayoutParams params = getWindow().getWindow().getAttributes();
+        params.y = 0;
+        params.x = 0;
+        params.width = WindowManager.LayoutParams.MATCH_PARENT;
+
+        Log.d(TAG,
+                "onConfigureWindow() called with: win = [" + win + "], isFullscreen = [" + isFullscreen + "], isCandidatesOnly = [" + isCandidatesOnly + "]");
+        getWindow().getWindow().setAttributes(params);
+    }
+
+    @Override
+    public void onComputeInsets(Insets outInsets) {
+
+        outInsets.contentTopInsets = mInputView.getHeight() + getNavBarHeight() + getWindow().getWindow().getAttributes().y;
+
+        // outInsets.visibleTopInsets =  getNavBarHeight();
+    }
+
+    @Override
+    public boolean onEvaluateFullscreenMode() {
+        return false;
+    }
+
+
+    private int getNavBarHeight() {
+        Resources resources = getResources();
+        int resourceId = resources.getIdentifier("navigation_bar_height", "dimen", "android");
+        if (resourceId > 0) {
+            return resources.getDimensionPixelSize(resourceId);
+        }
+        return 0;
     }
     /**
      * Called by the framework when your view for showing candidates needs to
