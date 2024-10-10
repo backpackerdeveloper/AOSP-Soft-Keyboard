@@ -18,12 +18,15 @@ package com.shubhamtripz.newkeyboard.newPackage2;
 
 import android.app.Dialog;
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.Resources;
 import android.inputmethodservice.InputMethodService;
 import android.inputmethodservice.Keyboard;
 import android.inputmethodservice.KeyboardView;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.text.InputType;
 import android.text.method.MetaKeyKeyListener;
 import android.util.Log;
@@ -36,18 +39,27 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.view.inputmethod.CompletionInfo;
 import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.ExtractedText;
+import android.view.inputmethod.ExtractedTextRequest;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
 import android.view.inputmethod.InputMethodSubtype;
 import android.widget.Button;
 import android.widget.LinearLayout;
-
+import android.text.Spanned;
+import android.view.textservice.TextInfo;
 import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.shubhamtripz.newkeyboard.R;
+import com.shubhamtripz.newkeyboard.adapter.EmojiAdapter;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Example of writing an input method for a soft keyboard.  This code is
@@ -87,6 +99,7 @@ public class SoftKeyboard extends InputMethodService
     private LatinKeyboard mQwertyKeyboard;
 
     private LatinKeyboard mCurKeyboard;
+    private RecyclerView emojiRecyclerView;
 
     private String mWordSeparators;
     private KeyboardDragDelegate keyboardDragDelegate;
@@ -100,7 +113,9 @@ public class SoftKeyboard extends InputMethodService
         mInputMethodManager = (InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);
         mWordSeparators = getResources().getString(R.string.word_separators);
         keyboardDragDelegate = new KeyboardDragDelegate(this, getWindow().getWindow());
+
     }
+
     /**
      * Returns the context object whose resources are adjusted to match the metrics of the display.
      *
@@ -160,9 +175,11 @@ public class SoftKeyboard extends InputMethodService
      */
     @Override
     public View onCreateInputView() {
+        // Inflate the keyboard layout
         final LinearLayout keyboardParent = (LinearLayout) getLayoutInflater().inflate(
                 R.layout.input, null);
 
+        // Set up the draggable handle for the keyboard
         Button handle = keyboardParent.findViewById(R.id.handle);
         handle.setOnTouchListener(new View.OnTouchListener() {
             @Override
@@ -170,13 +187,186 @@ public class SoftKeyboard extends InputMethodService
                 return keyboardDragDelegate.onTouch(view, motionEvent);
             }
         });
-        mInputView = (LatinKeyboardView) keyboardParent.findViewById(R.id.keyboard);
 
+        // Set up the Latin keyboard view
+        mInputView = keyboardParent.findViewById(R.id.keyboard);
         mInputView.setOnKeyboardActionListener(this);
         mInputView.setPreviewEnabled(false);
         setLatinKeyboard(mQwertyKeyboard);
+
+        // Set up RecyclerView for emoji selection
+        RecyclerView emojiRecyclerView = keyboardParent.findViewById(R.id.emojiRecyclerView);
+        emojiRecyclerView.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
+
+        // Sample emoji list
+        List<String> emojiList = new ArrayList<>(Arrays.asList(
+                "😀", "😂", "😍", "😎", "😭", "😡", "👍", "🙏", "🎉", "❤️",
+                "😢", "😱", "😜", "🤔", "🤗", "😴", "😇", "😏", "😲", "🙄",
+                "🤐", "😮", "🤩", "😋", "🤤", "😷", "🤒", "😅", "💪", "🙌",
+                "🤝", "💃", "🕺", "💔", "👀", "🤫", "🙃", "😤", "😖"
+        ));
+
+// Emoji to keyword mapping
+        Map<String, List<String>> emojiMap = new HashMap<>();
+        emojiMap.put("😀", Arrays.asList("happy", "smile", "joy"));
+        emojiMap.put("😂", Arrays.asList("laugh", "haha", "funny"));
+        emojiMap.put("😍", Arrays.asList("love", "heart", "romance"));
+        emojiMap.put("😎", Arrays.asList("cool", "chill", "confident"));
+        emojiMap.put("😭", Arrays.asList("cry", "sad", "tears"));
+        emojiMap.put("😡", Arrays.asList("angry", "mad", "furious"));
+        emojiMap.put("👍", Arrays.asList("thumbs up", "good", "approve"));
+        emojiMap.put("🙏", Arrays.asList("pray", "please", "request"));
+        emojiMap.put("🎉", Arrays.asList("party", "celebrate", "event"));
+        emojiMap.put("❤️", Arrays.asList("love", "heart", "romantic"));
+        emojiMap.put("😢", Arrays.asList("sad", "tearful", "grief"));
+        emojiMap.put("😱", Arrays.asList("shock", "scared", "surprise"));
+        emojiMap.put("😜", Arrays.asList("playful", "winky", "crazy"));
+        emojiMap.put("🤔", Arrays.asList("thinking", "hmm", "question"));
+        emojiMap.put("🤗", Arrays.asList("hug", "care", "friendly"));
+        emojiMap.put("😴", Arrays.asList("sleep", "tired", "zzz"));
+        emojiMap.put("😇", Arrays.asList("angel", "innocent", "pure"));
+        emojiMap.put("😏", Arrays.asList("smirk", "sly", "flirty"));
+        emojiMap.put("😲", Arrays.asList("shocked", "surprised", "amazed"));
+        emojiMap.put("🙄", Arrays.asList("eye roll", "bored", "whatever"));
+        emojiMap.put("🤐", Arrays.asList("silent", "zip", "secret"));
+        emojiMap.put("😮", Arrays.asList("wow", "astonished", "open mouth"));
+        emojiMap.put("🤩", Arrays.asList("starstruck", "excited", "amazed"));
+        emojiMap.put("😋", Arrays.asList("yum", "delicious", "satisfied"));
+        emojiMap.put("🤤", Arrays.asList("drool", "hungry", "crave"));
+        emojiMap.put("😷", Arrays.asList("sick", "ill", "mask"));
+        emojiMap.put("🤒", Arrays.asList("fever", "sick", "unwell"));
+        emojiMap.put("😅", Arrays.asList("nervous", "sweating", "relief"));
+        emojiMap.put("💪", Arrays.asList("strong", "power", "muscle"));
+        emojiMap.put("🙌", Arrays.asList("praise", "celebrate", "hooray"));
+        emojiMap.put("🤝", Arrays.asList("handshake", "agreement", "deal"));
+        emojiMap.put("💃", Arrays.asList("dance", "celebrate", "fun"));
+        emojiMap.put("🕺", Arrays.asList("dance", "groove", "party"));
+        emojiMap.put("💔", Arrays.asList("heartbreak", "sad", "broken"));
+        emojiMap.put("👀", Arrays.asList("eyes", "look", "watch"));
+        emojiMap.put("🤫", Arrays.asList("shush", "quiet", "secret"));
+        emojiMap.put("🙃", Arrays.asList("upside down", "playful", "awkward"));
+        emojiMap.put("😤", Arrays.asList("frustrated", "angry", "furious"));
+        emojiMap.put("😖", Arrays.asList("upset", "pain", "annoyed"));
+
+
+        // Set up the adapter with the click listener to handle emoji input
+        EmojiAdapter.OnEmojiClickListener listener = emoji -> {
+            InputConnection inputConnection = getCurrentInputConnection();
+            if (inputConnection != null) {
+                // Get the current cursor position
+                CharSequence currentText = inputConnection.getExtractedText(new ExtractedTextRequest(), 0).text;
+                int cursorPosition = inputConnection.getExtractedText(new ExtractedTextRequest(), 0).selectionStart;
+
+                // Insert the emoji at the current cursor position
+                inputConnection.commitText(currentText.subSequence(0, cursorPosition) + emoji + currentText.subSequence(cursorPosition, currentText.length()), 1);
+            }
+        };
+
+        // Handle "Share" button click
+        Button shareButton = keyboardParent.findViewById(R.id.share_btn);
+        shareButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                shareCurrentInput();
+            }
+        });
+
+        // Initialize the adapter and RecyclerView
+        EmojiAdapter emojiAdapter = new EmojiAdapter(emojiList, listener);
+        emojiRecyclerView.setAdapter(emojiAdapter);
+
+        // Add a repeating task to check text input changes for real-time emoji filtering
+        checkInputTextAndUpdateEmojis(emojiList, emojiMap, emojiAdapter);
+
         return keyboardParent;
     }
+
+    private void checkInputTextAndUpdateEmojis(List<String> emojiList, Map<String, List<String>> emojiMap, EmojiAdapter emojiAdapter) {
+        InputConnection inputConnection = getCurrentInputConnection();
+        if (inputConnection != null) {
+            ExtractedTextRequest request = new ExtractedTextRequest();
+
+            // Create a handler associated with the main thread
+            Handler mainHandler = new Handler(Looper.getMainLooper());
+
+            // Start a background thread to continuously poll for text changes
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    while (true) {
+                        ExtractedText extractedText = inputConnection.getExtractedText(request, 0);
+                        if (extractedText != null) {
+                            String inputText = extractedText.text.toString().toLowerCase();
+
+                            // Use the handler to post the update on the main thread
+                            mainHandler.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    filterEmojiList(inputText, emojiList, emojiMap, emojiAdapter);
+                                }
+                            });
+                        }
+
+                        // Sleep for a short time before checking again (for real-time updates)
+                        try {
+                            Thread.sleep(500); // Check every half second
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            }).start();
+        }
+    }
+
+
+
+    private void filterEmojiList(String inputText, List<String> emojiList, Map<String, List<String>> emojiMap, EmojiAdapter emojiAdapter) {
+        // Temporary list to store matching emojis
+        List<String> filteredEmojiList = new ArrayList<>();
+
+        // First, add emojis that match the input text (i.e., inputText matches tags)
+        for (String emoji : emojiList) {
+            List<String> tags = emojiMap.get(emoji);
+            if (tags != null && tags.stream().anyMatch(tag -> inputText.contains(tag))) {
+                filteredEmojiList.add(emoji);
+            }
+        }
+
+        // Add the remaining emojis that don't match the input text
+        for (String emoji : emojiList) {
+            if (!filteredEmojiList.contains(emoji)) {
+                filteredEmojiList.add(emoji);
+            }
+        }
+
+        // Update the emoji list in the adapter and refresh the RecyclerView
+        emojiList.clear();
+        emojiList.addAll(filteredEmojiList);
+        emojiAdapter.notifyDataSetChanged();
+    }
+
+
+    private void shareCurrentInput() {
+        InputConnection inputConnection = getCurrentInputConnection();
+        if (inputConnection != null) {
+            // Get the current text in the input field
+            ExtractedText extractedText = inputConnection.getExtractedText(new ExtractedTextRequest(), 0);
+            String currentInput = (extractedText != null) ? extractedText.text.toString() : "";
+
+            // Create an intent to share the input text and emojis
+            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+            shareIntent.setType("text/plain");
+            shareIntent.putExtra(Intent.EXTRA_TEXT, currentInput);
+
+            // Start the intent for sharing to other apps
+            Intent chooser = Intent.createChooser(shareIntent, "Share text via Bobble AI:");
+            chooser.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);  // Ensure the intent can be started from a service
+            startActivity(chooser);
+        }
+    }
+
+
 
     private void setLatinKeyboard(LatinKeyboard nextKeyboard) {
         final boolean shouldSupportLanguageSwitchKey =
@@ -202,10 +392,24 @@ public class SoftKeyboard extends InputMethodService
 
     @Override
     public void onComputeInsets(Insets outInsets) {
+        super.onComputeInsets(outInsets);
 
-        outInsets.contentTopInsets = mInputView.getHeight() + getNavBarHeight() + getWindow().getWindow().getAttributes().y;
+        if (mInputView != null) {
+            int inputViewHeight = mInputView.getHeight();
+            int navBarHeight = getNavBarHeight();
+            int windowYOffset = 0;
 
-        // outInsets.visibleTopInsets =  getNavBarHeight();
+            if (getWindow() != null && getWindow().getWindow() != null) {
+                windowYOffset = getWindow().getWindow().getAttributes().y;
+            }
+
+            outInsets.contentTopInsets = inputViewHeight + navBarHeight + windowYOffset;
+        } else {
+            // Fallback if mInputView is null
+            outInsets.contentTopInsets = outInsets.visibleTopInsets;
+        }
+
+
     }
 
     @Override

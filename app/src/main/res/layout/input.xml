@@ -3,15 +3,45 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/keyboardParent"
     android:orientation="vertical">
 
+    <!-- Emoji Selection RecyclerView -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/emojiRecyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        tools:listitem="@layout/item_emoji"
+        android:background="@color/white"
+        android:layout_gravity="center"
+        android:orientation="horizontal"
+        android:padding="8dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:weightSum="2">>
+
+    <!-- Drag Handle Button -->
     <Button
         android:id="@+id/handle"
         android:text="Drag"
-        android:layout_width="match_parent"
+        android:layout_weight="1"
+        android:layout_width="0dp"
         android:layout_height="wrap_content" />
 
+        <Button
+            android:id="@+id/share_btn"
+            android:layout_weight="1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:text="Share"/>
+
+    </LinearLayout>
+
+    <!-- Custom Keyboard View -->
     <com.shubhamtripz.newkeyboard.newPackage2.LatinKeyboardView
         android:id="@+id/keyboard"
         android:layout_width="match_parent"
@@ -19,6 +49,4 @@
         android:layout_gravity="center"
         android:background="@drawable/keyboard_background" />
 
-
 </LinearLayout>
-
